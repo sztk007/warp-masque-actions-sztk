@@ -32,6 +32,9 @@ jobs:
         env:
           PROTON_USER: ${{ secrets.PROTON_USER }}
           PROTON_PASS: ${{ secrets.PROTON_PASS }}
+          # Proton 版本号。不设就用脚本里的默认值；被退役时在
+          # Settings > Secrets and variables > Actions > Variables 改这个变量即可。
+          PROTON_APP_VERSION: ${{ vars.PROTON_APP_VERSION }}
         run: |
           set -euo pipefail
           if [ -z "${PROTON_USER:-}" ] || [ -z "${PROTON_PASS:-}" ]; then

@@ -11,6 +11,12 @@ from proton.session import Session
 from cryptography.hazmat.primitives.asymmetric import ed25519
 from cryptography.hazmat.primitives import serialization
 
+# Proton API 会周期性退役旧客户端版本（返回 5003 "app is no longer supported"）。
+# 不硬编码一个会过期的版本号，改成读环境变量，默认值已实测被 API 接受。
+# 以后被退役了，改 workflow 里的 PROTON_APP_VERSION 变量即可，不用动代码。
+DEFAULT_APP_VERSION = "linux-vpn@4.13.0"
+APP_VERSION = (os.environ.get("PROTON_APP_VERSION") or DEFAULT_APP_VERSION).split("@")[-1]
+
 # 只挑这些国家的落地，够用且不会让配置爆炸
 WANT = {"JP": "日本", "SG": "新加坡", "US": "美国", "NL": "荷兰",
         "CH": "瑞士", "CA": "加拿大", "PL": "波兰", "RO": "罗马尼亚",
@@ -29,8 +35,8 @@ def ed25519_to_wg(raw_sk: bytes) -> str:
 
 async def main():
     outdir = sys.argv[1] if len(sys.argv) > 1 else "dist"
-    s = Session(appversion="linux-vpn@4.8.2",
-                user_agent="ProtonVPN/4.8.2 (Linux; Ubuntu/24.04)")
+    s = Session(appversion=f"linux-vpn@{APP_VERSION}",
+                user_agent=f"ProtonVPN/{APP_VERSION} (Linux; Ubuntu/24.04)")
 
     if not await s.async_authenticate(os.environ["PROTON_USER"],
                                       os.environ["PROTON_PASS"]):
