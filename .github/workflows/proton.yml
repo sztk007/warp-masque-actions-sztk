@@ -2,6 +2,11 @@ name: 取 Proton 凭据
 
 on:
   workflow_dispatch:
+  # 改脚本或工作流时自动跑一次，改完立刻能验证，不用手动点
+  push:
+    paths:
+      - '.github/workflows/proton.yml'
+      - 'scripts/gen_proton.py'
   # 证书 7 天到期。注意 cron 的 */6 是"日期能被 6 整除"，不是"每隔 6 天"，
   # 月末衔接会不均匀。取每 3 天跑一次，失败一次也还有余量。
   schedule:
@@ -25,15 +30,16 @@ jobs:
           set -euo pipefail
           # 官方库自带 SRP 实现，不用自己写。
           # 它验 Modulus 的 PGP 签名要 gpg，runner 自带。
-          pip install -q "git+https://github.com/ProtonVPN/python-proton-core.git" cryptography
+          pip install -q "git+https://github.com/ProtonVPN/python-proton-core.git" cryptography aiohttp
           gpg --version | head -1
 
       - name: 登录并生成凭据
         env:
           PROTON_USER: ${{ secrets.PROTON_USER }}
           PROTON_PASS: ${{ secrets.PROTON_PASS }}
-          # Proton 版本号。不设就用脚本里的默认值；被退役时在
-          # Settings > Secrets and variables > Actions > Variables 改这个变量即可。
+          # 只是候选 appversion 的起点。脚本会先用 /auth/info 探测这个版本号
+          # 是否还被 Proton 接受（5003 = 已退役），被拒就自动往上换版本，
+          # 所以这里的值过期也不会让流水线挂掉。不设就用脚本里的默认值。
           PROTON_APP_VERSION: ${{ vars.PROTON_APP_VERSION }}
         run: |
           set -euo pipefail
