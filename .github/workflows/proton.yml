@@ -69,24 +69,27 @@ jobs:
 
       - name: 摘要
         if: always()
+        env:
+          # 只把「有没有配推送地址」变成布尔值传进脚本，不把 secret 本身插进 shell。
+          # 公开仓库的运行摘要所有人可见，绝不能把含 WireGuard 私钥的 blob 写进去。
+          PUSH_CONFIGURED: ${{ secrets.WORKER_PUSH_URL != '' }}
         run: |
           {
             echo '## Proton 凭据'
             echo
-            if [ -s dist/proton-blob.txt ]; then
-              if [ -n "${{ secrets.WORKER_PUSH_URL }}" ]; then
+            if [ ! -s dist/proton-blob.txt ]; then
+              echo '生成失败，看上面的日志。'
+            else
+              echo '凭据已生成。'
+              if [ "$PUSH_CONFIGURED" = 'true' ]; then
                 echo '已自动推送到 Worker，配置随即更新。'
               else
-                echo '没配推送地址，复制下面这段粘贴到 Worker 管理页：'
-                echo
-                echo '```'
-                cat dist/proton-blob.txt
-                echo '```'
+                echo '没配 WORKER_PUSH_URL，未自动推送。到本页 Artifacts 下载 `proton-blob` 后手动粘贴。'
               fi
               echo
+              echo '注意：凭据内含 WireGuard 私钥，不要贴进运行摘要、日志或聊天记录。'
+              echo
               echo '证书 7 天有效，本流水线每 3 天自动跑一次，不用手动管。'
-            else
-              echo '生成失败，看上面的日志。'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
