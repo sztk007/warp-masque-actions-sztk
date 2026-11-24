@@ -239,7 +239,7 @@ async def main():
         json.dump(payload, f, indent=2, ensure_ascii=False)
 
     print(f"\n已生成 {outdir}/proton-blob.txt（{len(blob)} 字符）")
-    print("把这段整个复制，粘贴到 Worker 管理页的 Proton 凭据框即可。")
+    print("由工作流通过 WORKER_PUSH_URL 推送给 Worker；本流水线不上传 artifact、不落公开产物。")
 
 
 try:

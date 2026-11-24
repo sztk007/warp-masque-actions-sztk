@@ -56,8 +56,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${URL:-}" ]; then
-            echo "没配 WORKER_PUSH_URL，跳过推送。凭据在 artifact 里，可手动粘贴。"
-            exit 0
+            echo "没配 WORKER_PUSH_URL：本流水线不上传 artifact（零暴露），凭据没有任何交付途径。"
+            echo "到 Settings > Secrets and variables > Actions 配置 WORKER_PUSH_URL 后重跑。"
+            exit 1
           fi
           # 令牌就在地址里，所以只需要这一个 secret
           CODE=$(curl -s -o /tmp/resp.json -w '%{http_code}' -X POST "$URL" \
@@ -84,20 +85,10 @@ jobs:
               if [ "$PUSH_CONFIGURED" = 'true' ]; then
                 echo '已自动推送到 Worker，配置随即更新。'
               else
-                echo '没配 WORKER_PUSH_URL，未自动推送。到本页 Artifacts 下载 `proton-blob` 后手动粘贴。'
+                echo '没配 WORKER_PUSH_URL，未推送也不留存，本次没有可用凭据；配置后重跑。'
               fi
               echo
-              echo '注意：凭据内含 WireGuard 私钥，不要贴进运行摘要、日志或聊天记录。'
-              echo
+              echo '本流水线不上传 artifact、不打印凭据内容，运行摘要与日志里均无私钥。'
               echo '证书 7 天有效，本流水线每 3 天自动跑一次，不用手动管。'
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: 上传 artifact
-        if: success()
-        uses: actions/upload-artifact@v6
-        with:
-          name: proton-blob
-          path: dist/proton-blob.txt
-          retention-days: 7
-          if-no-files-found: error
