@@ -38,7 +38,7 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${URL:-}" ]; then
-            echo "没配 WORKER_PUSH_URL，跳过推送。账号在 artifact 里，可手动粘贴。"
+            echo "没配 WORKER_PUSH_URL，跳过推送。账号在加密 artifact 里，解密后可手动粘贴。"
             exit 0
           fi
           # 和 Proton 共用一个推送地址，末尾加 /wind 区分
@@ -48,32 +48,44 @@ jobs:
           cat /tmp/resp.json; echo
           [ "$CODE" = "200" ] || { echo "推送失败"; exit 1; }
 
-      - name: 上传 artifact
+      - name: 加密账号凭据
         if: always()
-        uses: actions/upload-artifact@v4
+        env:
+          ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [ ! -s dist/wind-account.json ]; then
+            echo "开户没成功，没有凭据可加密，跳过。"
+            exit 0
+          fi
+          bash scripts/pack_encrypted.sh dist wind-account.tar.gz.enc
+
+      - name: 上传加密 artifact
+        if: always()
+        uses: actions/upload-artifact@v6
         with:
           name: wind-account
-          path: dist/wind-account.json
+          path: wind-account.tar.gz.enc
           retention-days: 1
           if-no-files-found: ignore
 
       - name: 摘要
         if: always()
+        env:
+          PUSH_CONFIGURED: ${{ secrets.WORKER_PUSH_URL != '' }}
         run: |
           {
             echo '## Windscribe 账号'
             echo
-            if [ -s dist/wind-account.json ]; then
-              UID_=$(jq -r .userId dist/wind-account.json)
-              GB=$(jq -r '.trafficMax/1073741824|floor*100/100' dist/wind-account.json)
-              echo "账号 \`$UID_\`，额度 ${GB} GB"
-              echo
-              if [ -n "${{ secrets.WORKER_PUSH_URL }}" ]; then
-                echo '已推送到 Worker，订阅里会出现 Windscribe 线路。'
-              else
-                echo '没配 `WORKER_PUSH_URL`，账号在下面的 artifact 里。'
-              fi
+            if [ -s wind-account.tar.gz.enc ]; then
+              echo '加密包已生成，artifact 里只有密文，明文账号不公开。'
             else
               echo '开户没成功。多半是这台 runner 的 IP 被用过了，重跑一次就行。'
+            fi
+            echo
+            if [ "$PUSH_CONFIGURED" = 'true' ]; then
+              echo '已推送到 Worker，订阅里会出现 Windscribe 线路。'
+            else
+              echo '没配 `WORKER_PUSH_URL`，账号在加密 artifact 里，解密后用。'
             fi
           } >> "$GITHUB_STEP_SUMMARY"

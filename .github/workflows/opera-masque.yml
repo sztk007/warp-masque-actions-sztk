@@ -7,14 +7,10 @@ on:
         description: WARP 设备名（后台显示用）
         required: false
         default: gh-actions
-      commit:
-        description: 把生成的 yaml 提交回仓库
-        type: boolean
-        required: false
-        default: true
+      # 不再提供「提交回仓库」选项：公开仓库里绝不能出现含私钥的明文配置。
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
@@ -67,23 +63,19 @@ jobs:
           ./mihomo -t -d check
           echo "配置校验通过"
 
-      - name: 提交回仓库
-        if: inputs.commit
+      - name: 加密凭据与配置
+        env:
+          ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE }}
         run: |
           set -euo pipefail
-          mkdir -p configs
-          cp dist/opera-masque.yaml configs/opera-masque.yaml
-          git config user.name  "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add configs/opera-masque.yaml
-          git diff --staged --quiet && { echo "内容无变化，跳过提交"; exit 0; }
-          git commit -m "自动更新: Opera over MASQUE 配置 ($(date -u '+%F %T') UTC)"
-          git push
+          bash scripts/pack_encrypted.sh dist opera-masque.tar.gz.enc
+          # 不再把含私钥的明文配置提交回仓库，也不留在工作区
+          rm -rf dist
 
-      - name: 上传 artifact
+      - name: 上传加密 artifact
         uses: actions/upload-artifact@v6
         with:
           name: opera-masque
-          path: dist/
+          path: opera-masque.tar.gz.enc
           retention-days: 7
           if-no-files-found: error

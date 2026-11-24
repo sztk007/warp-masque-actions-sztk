@@ -65,17 +65,39 @@ jobs:
           ./mihomo -t -d check
           echo "配置校验通过"
 
-      - name: 打包凭据与配置
+      - name: 打包并加密凭据
+        env:
+          ARTIFACT_PASSPHRASE: ${{ secrets.ARTIFACT_PASSPHRASE }}
         run: |
+          set -euo pipefail
           cp config.json dist/usque-config.json
           test -s dist/warp-masque.yaml
           test -s dist/warp-masque-shadowrocket.txt
-          ls -l dist
+          # 只列文件名，不打印内容
+          ls -1 dist
+          bash scripts/pack_encrypted.sh dist warp-masque-config.tar.gz.enc
+          # artifact 只上传密文，明文目录不再保留
+          rm -rf dist
 
-      - name: 上传 artifact
+      - name: 上传加密 artifact
         uses: actions/upload-artifact@v6
         with:
           name: warp-masque-config
-          path: dist/
+          # 单个密文文件，公开可下载也不含明文私钥
+          path: warp-masque-config.tar.gz.enc
           retention-days: ${{ github.event.inputs.retention_days || 7 }}
           if-no-files-found: error
+
+      - name: 摘要
+        if: always()
+        run: |
+          {
+            echo '## WARP MASQUE 配置'
+            echo
+            if [ -s warp-masque-config.tar.gz.enc ]; then
+              echo '加密包已生成，artifact 里只有密文，明文私钥不公开。'
+              echo '下载后用仓库 secret ARTIFACT_PASSPHRASE 解密，命令见 README「4. 下载并解密」。'
+            else
+              echo '生成或加密失败，看上面的日志。'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

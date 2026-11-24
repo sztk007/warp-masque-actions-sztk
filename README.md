@@ -23,19 +23,34 @@
 Fork 过来的仓库默认不开 Actions，会看到一个提示，点
 `I understand my workflows, go ahead and enable them` 就行。
 
+**先加一个 secret**（三条流水线都会用到）：到
+`Settings → Secrets and variables → Actions → New repository secret`，
+名字填 `ARTIFACT_PASSPHRASE`，值自己定一个长口令并记住。
+下载 artifact 后要用它解密；没配的话流水线会直接报错，不会上传任何明文产物。
+
 **3. 跑一次**
 
 左边选 `生成 WARP MASQUE 配置`，右边点 `Run workflow`，绿色按钮再点一次。
 等一分钟左右。
 
-**4. 下载**
+**4. 下载并解密**
 
 跑完点进这次运行的页面，最下面 `Artifacts` 里有个 `warp-masque-config`，
-下载解压。
+下载得到 `warp-masque-config.tar.gz.enc`（**密文**，公开下载也没关系）。
+本地解密，口令就是上面设的 `ARTIFACT_PASSPHRASE`：
+
+```bash
+ARTIFACT_PASSPHRASE='你的口令' openssl enc -d -aes-256-cbc -pbkdf2 \
+  -iter 200000 -salt -pass env:ARTIFACT_PASSPHRASE \
+  -in warp-masque-config.tar.gz.enc | tar xzf -
+```
+
+Opera 那条同理，文件名换成 `opera-masque.tar.gz.enc`；
+Windscribe 是 `wind-account.tar.gz.enc`。
 
 **5. 导入客户端**
 
-解压出来三个文件：
+解密出来三个文件：
 
 - `warp-masque.yaml` —— mihomo 配置，57 个节点，直接导入 Clash Verge / ClashMi 这类客户端
 - `warp-masque-shadowrocket.txt` —— Shadowrocket 用的 `masque://` 链接，一行一个，挑一条复制进去
@@ -65,7 +80,7 @@ masque 只有 mihomo 的 Alpha 分支才有，稳定版导进去会直接报错�
 把 `warp-masque.yaml` 直接导进去就行。同一个 App 也有 macOS / Android /
 Windows / Linux 版本。
 
-Shadowrocket 也能用。它不吃 yaml，但 artifact 里已经带了
+Shadowrocket 也能用。它不吃 yaml，但加密包解密后有
 `warp-masque-shadowrocket.txt`，一行一个 `masque://` 链接，
 挑一条复制进 Shadowrocket 就行。
 
@@ -94,8 +109,14 @@ Surge、Quantumult X、Karing 不是 mihomo 内核，也不认 masque，导进�
 
 ## 几个提醒
 
-配置里的 `private-key` 相当于账号密码，别往外发。artifact 默认存 7 天，
-公开仓库的 artifact 谁都能下载，介意就把 fork 出来的仓库设成私有。
+配置里的 `private-key` 相当于账号密码，别往外发。三条流水线现在都只上传
+`ARTIFACT_PASSPHRASE` 加密后的包，明文密钥不进 artifact、不进运行摘要、
+也不再提交回仓库。口令别写进任何公开文件。
+
+**旧密钥视为已泄露。** 这个仓库以前把含明文私钥的
+`configs/opera-masque.yaml` 提交过，git 历史里还留着（本轮没有重写历史）。
+现在文件已删除、自动提交已禁用，但请重新跑一次流水线换一套全新密钥，
+别再用历史里那套。
 
 想换一套密钥就重新跑一次 workflow，每次都是全新账号。
 
@@ -146,15 +167,16 @@ uses: actions/upload-artifact@v6
 
 ### artifact 过期了怎么办
 
-重新跑一次 workflow，会生成一套全新的密钥和配置。artifact 默认存 7 天，
-想留久一点在 Run workflow 的时候把保留天数改大。
+重新跑一次 workflow，会生成一套全新的密钥和配置。加密包默认存 7 天，
+想留久一点在 Run workflow 的时候把保留天数改大。过期了也无所谓，
+反正是密文；解密后的明文文件自己保管好，别传回公开仓库。
 
 ### iOS 怎么用
 
 用 [ClashMi](https://github.com/KaringX/clashmi)，它内置 mihomo 内核，
 `warp-masque.yaml` 直接导入就行，和桌面端一样。
 
-Shadowrocket 也支持 masque。它不认 yaml，但 artifact 里的
+Shadowrocket 也支持 masque。它不认 yaml，但加密包解密后的
 `warp-masque-shadowrocket.txt` 就是现成的 `masque://` 链接，
 一行一个，复制一条导进去即可。
 
@@ -224,8 +246,9 @@ Opera 的地址整个封在 QUIC 隧道里。抓包对比过，直连能看到 O
 
 Actions 里选 `Opera over MASQUE（套娃）`，点 Run workflow。
 
-跑完配置有两个地方：仓库里的 `configs/opera-masque.yaml`（流水线自动提交回来），
-或者运行页面下面的 Artifacts。只想下载不想提交的话，跑之前把 `commit` 勾去掉。
+跑完配置只在运行页面下面的 `Artifacts` 里，是加密包 `opera-masque.tar.gz.enc`，
+按上面「4. 下载并解密」的命令解密后使用。
+流水线不再把含私钥的明文配置提交回仓库，`commit` 选项也已移除。
 
 ### Opera 凭据会过期
 
