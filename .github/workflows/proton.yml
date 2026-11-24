@@ -37,10 +37,10 @@ jobs:
         env:
           PROTON_USER: ${{ secrets.PROTON_USER }}
           PROTON_PASS: ${{ secrets.PROTON_PASS }}
-          # 只是候选 appversion 的起点。脚本会先用 /auth/info 探测这个版本号
-          # 是否还被 Proton 接受（5003 = 已退役），被拒就自动往上换版本，
-          # 所以这里的值过期也不会让流水线挂掉。不设就用脚本里的默认值。
-          PROTON_APP_VERSION: ${{ vars.PROTON_APP_VERSION }}
+          # 不注入 PROTON_APP_VERSION：脚本内置默认 4.19.1，登录前会先用
+          # /auth/info 探测（5003 = 已退役）并自动往上换版本。仓库 Actions
+          # variable 里那个 4.13.0 已过期且无需维护，别再让它进来当起点。
+          # 真要手动指定版本，在 fork / 自跑时直接设同名环境变量即可。
         run: |
           set -euo pipefail
           if [ -z "${PROTON_USER:-}" ] || [ -z "${PROTON_PASS:-}" ]; then
